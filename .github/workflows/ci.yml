@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "latest"
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Run linter
+        run: uv run ruff check src tests
+
+      - name: Run type checker
+        run: uv run mypy src
+
+      - name: Run tests
+        run: uv run pytest -v
+
+  gourmand:
+    name: Code Quality (Gourmand)
+    uses: crunchtools/gatehouse/.github/workflows/gourmand.yml@v0
+
+  build-container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build container image
+        run: |
+          docker build -f Containerfile -t mcp-rhhi:test .
+
+      - name: Verify container
+        run: |
+          docker run --rm --entrypoint python mcp-rhhi:test -c "from mcp_rhhi_crunchtools import main"

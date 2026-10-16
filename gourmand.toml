@@ -1,0 +1,16 @@
+# Gourmand Configuration
+# AI slop detection for maintaining code quality
+# See https://gitlab.com/mattdm/gourmand for documentation
+# Path exclusions: Gourmand ignores [global] excluded_paths in this file.
+# Use .gitignore, or .gourmand-exceptions.d/globals.toml for tracked paths.
+
+[checks]
+
+[severity]
+# Override severity levels for specific checks
+# check_name = "warning"  # Options: error, warning, info
+
+[output]
+# Output format options
+format = "text"  # Options: text, json, github
+color = true

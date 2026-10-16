@@ -1,0 +1,21 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.crunchtools/rhhi",
+  "title": "MCP RHHI",
+  "description": "Read-only MCP server for the Hummingbird / Red Hat Hardened Images catalog: images, CVEs, SBOMs",
+  "repository": {
+    "url": "https://github.com/crunchtools/mcp-rhhi",
+    "source": "github"
+  },
+  "version": "0.1.0",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "mcp-rhhi-crunchtools",
+      "version": "0.1.0",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}

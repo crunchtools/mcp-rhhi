@@ -1,0 +1,26 @@
+# Gourmand exceptions for mcp-rhhi-crunchtools. Each one names the check, the
+# file, and why the flagged pattern is intended here.
+
+[[exceptions]]
+check = "CH012-copy_paste_detection"
+path = "src/mcp_rhhi_crunchtools/client.py"
+justification = "get_client() and get_config() are the profile's lazy module singletons (the conftest autouse fixture resets both by name). They share four statements because they are the same pattern over different types; merging them into a generic factory would hide which global each test resets."
+classification = "by_design"
+
+[[exceptions]]
+check = "EV013-hidden_env_config"
+path = "src/mcp_rhhi_crunchtools/config.py"
+justification = "RHHI_API_URL and RHHI_TIMEOUT are the server's only two settings, read in Config.__init__ with defaults https://api-hummingbird.hummingbird-project.io and 30. Both are documented by name, default and purpose in README.md, CLAUDE.md and .specify/memory/constitution.md."
+classification = "by_design"
+
+[[exceptions]]
+check = "EV013-hidden_env_config"
+path = "tests/test_validation.py"
+justification = "TestConfig sets the same two documented variables (RHHI_API_URL, RHHI_TIMEOUT) through monkeypatch to exercise Config; they are not test-only toggles."
+classification = "by_design"
+
+[[exceptions]]
+check = "EV002-manifest_lint_suppression"
+path = "pyproject.toml"
+justification = "Each ignore was checked against this repo with `ruff check --isolated --select <RULE>` before being kept. src: TRY003 (7 hits, descriptive UserError messages), PLR0913 (4, tool signatures mirror the API's filters), PLR2004 (2, HTTP 404/429 in client.py), PLW0603 (2, the client and config singletons), TID252 (11, the package's own relative imports). tests/*: S101 (92, pytest asserts), PLC0415 (8, importing the module under test inside a fixture so singletons reset), PLR2004 (14, expected counts). S105 was dropped from the tests ignore because nothing here holds a secret."
+classification = "by_design"

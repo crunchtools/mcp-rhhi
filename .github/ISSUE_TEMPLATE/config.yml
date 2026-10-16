@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Hummingbird Catalog API (Swagger)
+    url: https://api-hummingbird.hummingbird-project.io/v1/docs/
+    about: Check the catalog API docs for endpoint behavior questions
