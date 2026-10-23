@@ -13,10 +13,12 @@ from .models import (
     HistoryLimit,
     ListLimit,
     OptionalQuery,
+    OptionalRequestStatus,
     OptionalSbomCategory,
     OptionalSeverity,
     OptionalSlug,
     ReadmeChars,
+    RequestIdentifier,
     Slug,
     VulnId,
 )
@@ -24,6 +26,7 @@ from .tools import (
     find_cve,
     get_catalog_vulnerabilities,
     get_image,
+    get_image_request,
     get_release_details,
     get_release_history,
     get_release_sbom,
@@ -31,6 +34,7 @@ from .tools import (
     get_sbom,
     get_tag_details,
     get_tag_vulnerabilities,
+    list_image_requests,
     list_images,
     list_tags,
 )
@@ -41,14 +45,16 @@ READ_ONLY = {"readOnlyHint": True}
 
 mcp = FastMCP(
     name="mcp-rhhi-crunchtools",
-    version="0.1.0",
+    version="0.2.0",
     instructions=(
         "Hummingbird / Red Hat Hardened Images catalog: minimal, distroless OCI "
         "images. Typical flow: list_images to find an image, list_tags for its "
         "current tags (pull_url, digest, canonical), then get_tag_details, "
         "get_sbom or get_tag_vulnerabilities with the canonical tag. Use the "
         "'builder' variant for build stages and 'default' for runtime. "
-        "get_catalog_vulnerabilities and find_cve cover every current tag."
+        "get_catalog_vulnerabilities and find_cve cover every current tag. "
+        "list_image_requests and get_image_request track requests for new images "
+        "on images.redhat.com/image-requests, each with a public deep link."
     ),
 )
 
@@ -263,3 +269,38 @@ async def get_release_vulnerabilities_tool(
     return await get_release_vulnerabilities(
         name=name, digest=digest, min_severity=min_severity, limit=limit
     )
+
+
+@mcp.tool(annotations=READ_ONLY)
+async def list_image_requests_tool(
+    status: Annotated[
+        OptionalRequestStatus,
+        Field(description="Only this status: Submitted, In progress, Delivered, Declined"),
+    ] = None,
+    search: Annotated[
+        OptionalQuery,
+        Field(description="Case-insensitive substring of the request title or HUM key"),
+    ] = None,
+) -> dict[str, Any]:
+    """List image requests from images.redhat.com/image-requests.
+
+    Each request carries its HUM key, title, friendly status
+    (Submitted/In progress/Delivered/Declined) and the public deep_link that
+    opens it on the site. Filter by status or a title/key substring.
+    """
+    return await list_image_requests(status=status, search=search)
+
+
+@mcp.tool(annotations=READ_ONLY)
+async def get_image_request_tool(
+    request: Annotated[
+        RequestIdentifier,
+        Field(description="HUM key (e.g. 'HUM-8787' or '8787') or image title (e.g. 'Redis 8')"),
+    ],
+) -> dict[str, Any]:
+    """Get one image request by HUM key or image title.
+
+    Returns the HUM key, title, friendly status, submitted/updated dates, the
+    public status note, and the deep_link that opens it on images.redhat.com.
+    """
+    return await get_image_request(request=request)

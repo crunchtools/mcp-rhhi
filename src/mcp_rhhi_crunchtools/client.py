@@ -28,14 +28,15 @@ class CatalogClient:
     - Response size limit, enforced while the decoded body streams in
     """
 
-    def __init__(self) -> None:
+    def __init__(self, base_url: str | None = None) -> None:
         self._config = get_config()
+        self._base_url = base_url if base_url is not None else self._config.api_base_url
         self._client: httpx.AsyncClient | None = None
 
     async def _get_client(self) -> httpx.AsyncClient:
         if self._client is None:
             self._client = httpx.AsyncClient(
-                base_url=self._config.api_base_url,
+                base_url=self._base_url,
                 headers={"Accept": "application/json", "Accept-Encoding": "gzip"},
                 timeout=httpx.Timeout(self._config.timeout),
             )
@@ -118,6 +119,7 @@ def _raise_for_status(response: httpx.Response, body: bytes, path: str) -> None:
 
 
 _client: CatalogClient | None = None
+_requests_client: CatalogClient | None = None
 
 
 def get_client() -> CatalogClient:
@@ -126,3 +128,11 @@ def get_client() -> CatalogClient:
     if _client is None:
         _client = CatalogClient()
     return _client
+
+
+def get_requests_client() -> CatalogClient:
+    """Get the global image-request client (points at the request API gateway)."""
+    global _requests_client
+    if _requests_client is None:
+        _requests_client = CatalogClient(base_url=get_config().requests_api_base_url)
+    return _requests_client

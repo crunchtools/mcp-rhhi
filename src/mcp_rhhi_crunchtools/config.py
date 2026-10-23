@@ -13,13 +13,39 @@ from .errors import ConfigurationError
 logger = logging.getLogger(__name__)
 
 DEFAULT_API_URL = "https://api-hummingbird.hummingbird-project.io"
+# Image requests are served by a separate API gateway from the catalog: they are
+# sourced from Jira HUM "Image Request" stories and published on
+# images.redhat.com/image-requests. This is the gateway the public site itself calls.
+DEFAULT_REQUESTS_API_URL = "https://s4jv1nv2e0.execute-api.us-east-1.amazonaws.com/prod"
+DEFAULT_SITE_URL = "https://images.redhat.com"
 DEFAULT_TIMEOUT = 30.0
 MAX_TIMEOUT = 300.0
 LOCAL_HOSTS = ("localhost", "127.0.0.1", "::1")
 
 
+def _clean_url(raw: str, name: str) -> str:
+    """Validate and normalize an API/site URL the same way for every setting."""
+    url = raw.strip().rstrip("/")
+    parsed = urlparse(url)
+    try:
+        _ = parsed.port
+    except ValueError as e:
+        raise ConfigurationError(f"Invalid {name}: bad port") from e
+    if not parsed.scheme or not parsed.netloc:
+        raise ConfigurationError(f"Invalid {name}: must be an absolute https:// URL")
+    if parsed.scheme != "https" and parsed.hostname not in LOCAL_HOSTS:
+        raise ConfigurationError(f"{name} must use HTTPS for non-localhost URLs")
+    if parsed.username or parsed.password or parsed.query or parsed.fragment:
+        raise ConfigurationError(f"{name} must not carry credentials, a query string or a fragment")
+    return url
+
+
 class Config:
-    """Catalog API location and request timeout, read from the environment."""
+    """API locations and request timeout, read from the environment.
+
+    Covers the catalog API, the separate image-request API gateway, the public
+    site URL used to build image-request deep links, and the request timeout.
+    """
 
     def __init__(self) -> None:
         """Initialize configuration from environment variables.
@@ -27,21 +53,15 @@ class Config:
         Raises:
             ConfigurationError: If an environment variable is invalid.
         """
-        api_url = os.environ.get("RHHI_API_URL", DEFAULT_API_URL).strip().rstrip("/")
-        parsed = urlparse(api_url)
-        try:
-            _ = parsed.port
-        except ValueError as e:
-            raise ConfigurationError("Invalid RHHI_API_URL: bad port") from e
-        if not parsed.scheme or not parsed.netloc:
-            raise ConfigurationError("Invalid RHHI_API_URL: must be a URL like " + DEFAULT_API_URL)
-        if parsed.scheme != "https" and parsed.hostname not in LOCAL_HOSTS:
-            raise ConfigurationError("RHHI_API_URL must use HTTPS for non-localhost URLs")
-        if parsed.username or parsed.password or parsed.query or parsed.fragment:
-            raise ConfigurationError(
-                "RHHI_API_URL must not carry credentials, a query string or a fragment"
-            )
-        self._base_url = api_url
+        self._base_url = _clean_url(os.environ.get("RHHI_API_URL", DEFAULT_API_URL), "RHHI_API_URL")
+        self._requests_base_url = _clean_url(
+            os.environ.get("RHHI_REQUESTS_API_URL", DEFAULT_REQUESTS_API_URL),
+            "RHHI_REQUESTS_API_URL",
+        )
+        self._site_base_url = _clean_url(
+            os.environ.get("RHHI_SITE_URL", DEFAULT_SITE_URL), "RHHI_SITE_URL"
+        )
+        parsed = urlparse(self._base_url)
 
         raw_timeout = os.environ.get("RHHI_TIMEOUT", "").strip()
         try:
@@ -58,6 +78,16 @@ class Config:
     def api_base_url(self) -> str:
         """Catalog API v1 base URL."""
         return f"{self._base_url}/v1"
+
+    @property
+    def requests_api_base_url(self) -> str:
+        """Image-request API base URL (a separate gateway from the catalog)."""
+        return self._requests_base_url
+
+    @property
+    def site_base_url(self) -> str:
+        """Public site base URL used to build image-request deep links."""
+        return self._site_base_url
 
     @property
     def timeout(self) -> float:

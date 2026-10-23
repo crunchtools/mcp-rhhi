@@ -27,7 +27,7 @@ A secure, read-only MCP (Model Context Protocol) server for the [Hummingbird](ht
 - **Canonical tag** - version-pinned tag used by the detail, SBOM and CVE tools (`3.14.8`, `3.14.8-builder`)
 - **Superseded** - a tag replaced by a newer one in its stream+variant; hidden unless asked for
 
-## Tools (12)
+## Tools (14)
 
 ### Images
 - `list_images` - all images with streams, variants and pull URL; filter by text or category
@@ -46,6 +46,12 @@ A secure, read-only MCP (Model Context Protocol) server for the [Hummingbird](ht
 ### Release history
 - `get_release_history` - past releases of a stream+variant (digest, date, source commit)
 - `get_release_details`, `get_release_sbom`, `get_release_vulnerabilities` - the same views for a historical digest
+
+### Image requests
+- `list_image_requests` - requests for new images on [images.redhat.com/image-requests](https://images.redhat.com/image-requests); filter by status or a title/key substring
+- `get_image_request` - one request by HUM key or image title; returns status, status note and the public `deep_link`
+
+Each request includes its HUM key, title, friendly status (Submitted / In progress / Delivered / Declined) and a `deep_link` of the form `https://images.redhat.com/image-requests?request=HUM-NNNN` that opens it on the site.
 
 ## Installation
 
@@ -69,6 +75,8 @@ podman run -d -p 127.0.0.1:8030:8030 quay.io/crunchtools/mcp-rhhi \
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `RHHI_API_URL` | No | `https://api-hummingbird.hummingbird-project.io` | Catalog API base URL; HTTPS required except for localhost |
+| `RHHI_REQUESTS_API_URL` | No | request gateway behind images.redhat.com | Image-request API base URL (a separate gateway from the catalog); HTTPS required except for localhost |
+| `RHHI_SITE_URL` | No | `https://images.redhat.com` | Public site base URL used to build image-request deep links |
 | `RHHI_TIMEOUT` | No | `30` | Request timeout in seconds (max 300) |
 
 ## Example Usage
