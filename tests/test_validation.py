@@ -12,9 +12,11 @@ from mcp_rhhi_crunchtools.models import (
     Digest,
     HistoryLimit,
     OptionalQuery,
+    OptionalRequestStatus,
     OptionalSbomCategory,
     OptionalSeverity,
     OptionalSlug,
+    RequestIdentifier,
     Slug,
     VulnId,
     digest_segment,
@@ -76,6 +78,19 @@ class TestOptionalNormalization:
         assert TypeAdapter(OptionalSbomCategory).validate_python("RUNTIME") == "runtime"
         with pytest.raises(PydanticValidationError):
             TypeAdapter(OptionalSbomCategory).validate_python("docs")
+
+    def test_request_status(self) -> None:
+        assert TypeAdapter(OptionalRequestStatus).validate_python("submitted") == "Submitted"
+        assert TypeAdapter(OptionalRequestStatus).validate_python(" IN PROGRESS ") == "In progress"
+        assert TypeAdapter(OptionalRequestStatus).validate_python("") is None
+        with pytest.raises(PydanticValidationError):
+            TypeAdapter(OptionalRequestStatus).validate_python("waiting")
+
+    def test_request_identifier(self) -> None:
+        assert TypeAdapter(RequestIdentifier).validate_python("  HUM-8787 ") == "HUM-8787"
+        assert TypeAdapter(RequestIdentifier).validate_python("Redis 8") == "Redis 8"
+        with pytest.raises(PydanticValidationError):
+            TypeAdapter(RequestIdentifier).validate_python("")
 
     def test_optional_slug_still_validates_values(self) -> None:
         with pytest.raises(PydanticValidationError):
@@ -157,10 +172,28 @@ class TestConfig:
 
     def test_defaults(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("RHHI_API_URL", raising=False)
+        monkeypatch.delenv("RHHI_REQUESTS_API_URL", raising=False)
+        monkeypatch.delenv("RHHI_SITE_URL", raising=False)
         monkeypatch.delenv("RHHI_TIMEOUT", raising=False)
         config = Config()
         assert config.api_base_url == "https://api-hummingbird.hummingbird-project.io/v1"
+        assert config.requests_api_base_url.startswith("https://")
+        assert config.site_base_url == "https://images.redhat.com"
         assert config.timeout == 30.0
+
+    def test_custom_request_urls(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("RHHI_API_URL", raising=False)
+        monkeypatch.setenv("RHHI_REQUESTS_API_URL", "https://example.com/prod/")
+        monkeypatch.setenv("RHHI_SITE_URL", "http://localhost:3000")
+        config = Config()
+        assert config.requests_api_base_url == "https://example.com/prod"
+        assert config.site_base_url == "http://localhost:3000"
+
+    def test_bad_request_url(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("RHHI_API_URL", raising=False)
+        monkeypatch.setenv("RHHI_REQUESTS_API_URL", "http://example.com")
+        with pytest.raises(ConfigurationError):
+            Config()
 
     def test_custom(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("RHHI_API_URL", "http://localhost:9000/")

@@ -16,6 +16,7 @@ from mcp_rhhi_crunchtools.tools import (
     find_cve,
     get_catalog_vulnerabilities,
     get_image,
+    get_image_request,
     get_release_details,
     get_release_history,
     get_release_sbom,
@@ -23,6 +24,7 @@ from mcp_rhhi_crunchtools.tools import (
     get_sbom,
     get_tag_details,
     get_tag_vulnerabilities,
+    list_image_requests,
     list_images,
     list_tags,
 )
@@ -158,15 +160,15 @@ class TestToolRegistration:
             assert callable(getattr(tools_mod, name)), f"{name} is not callable"
 
     def test_tool_count(self) -> None:
-        """Server should have exactly 12 tools."""
+        """Server should have exactly 14 tools."""
         from mcp_rhhi_crunchtools.tools import __all__
 
-        assert len(__all__) == 12
+        assert len(__all__) == 14
 
     @pytest.mark.asyncio
     async def test_registered_count(self) -> None:
         """Every tool function has a registered wrapper."""
-        assert len(await mcp.list_tools()) == 12
+        assert len(await mcp.list_tools()) == 14
 
 
 READ_ONLY = frozenset(
@@ -174,6 +176,7 @@ READ_ONLY = frozenset(
         "find_cve_tool",
         "get_catalog_vulnerabilities_tool",
         "get_image_tool",
+        "get_image_request_tool",
         "get_release_details_tool",
         "get_release_history_tool",
         "get_release_sbom_tool",
@@ -181,6 +184,7 @@ READ_ONLY = frozenset(
         "get_sbom_tool",
         "get_tag_details_tool",
         "get_tag_vulnerabilities_tool",
+        "list_image_requests_tool",
         "list_images_tool",
         "list_tags_tool",
     }
@@ -195,6 +199,7 @@ READ_ONLY_CALLS: dict[str, dict[str, object]] = {
     "find_cve_tool": {"cve_id": "CVE-2026-0001"},
     "get_catalog_vulnerabilities_tool": {},
     "get_image_tool": _IMAGE,
+    "get_image_request_tool": {"request": "HUM-8787"},
     "get_release_details_tool": _RELEASE,
     "get_release_history_tool": {**_IMAGE, "stream": "3.14"},
     "get_release_sbom_tool": _RELEASE,
@@ -202,8 +207,16 @@ READ_ONLY_CALLS: dict[str, dict[str, object]] = {
     "get_sbom_tool": _TAG,
     "get_tag_details_tool": _TAG,
     "get_tag_vulnerabilities_tool": _TAG,
+    "list_image_requests_tool": {},
     "list_images_tool": {},
     "list_tags_tool": _IMAGE,
+}
+
+# A read-only tool reaches the backend before it can find nothing; the image-request
+# lookup needs its list body to contain the key it is asked for so it does not raise.
+READ_ONLY_RESPONSES: dict[str, object] = {
+    "get_image_request_tool": [{"id": "HUM-8787", "summary": "Redis 8", "status": "Submitted"}],
+    "list_image_requests_tool": [{"id": "HUM-8787", "summary": "Redis 8", "status": "Submitted"}],
 }
 
 
@@ -228,7 +241,8 @@ class TestReadOnlyAnnotation:
     @pytest.mark.parametrize("name", sorted(READ_ONLY))
     async def test_read_only_tool_only_sends_get(self, name: str) -> None:
         """A read-only tool reaches the catalog with GET and no request body."""
-        with _patch_client(_mock_response(json_data={})) as client_cls:
+        body = READ_ONLY_RESPONSES.get(name, {})
+        with _patch_client(_mock_response(json_data=body)) as client_cls:
             await mcp.call_tool(name, READ_ONLY_CALLS[name])
         sent = _sent_requests(client_cls)
         assert sent
@@ -440,6 +454,108 @@ class TestReleaseTools:
             result = await get_release_vulnerabilities("python", DIGEST)
         assert _requested_url(client_cls).startswith("/images/python/releases/vulnerabilities/")
         assert result["matched"] == 3
+
+
+REQUESTS = [
+    {
+        "id": "HUM-8787",
+        "summary": "Redis 8",
+        "status": "Submitted",
+        "submitted": "2026-09-01T00:00:00+0000",
+        "updated": "2026-10-01T00:00:00+0000",
+        "resolution_date": None,
+        "notes": "SSPL — license review required",
+    },
+    {
+        "id": "HUM-6024",
+        "summary": "OpenJDK 21",
+        "status": "Delivered",
+        "submitted": "2026-05-01T00:00:00+0000",
+        "updated": "2026-08-01T00:00:00+0000",
+        "resolution_date": "2026-08-01T00:00:00+0000",
+        "notes": "GPLv2 with Classpath Exception.",
+    },
+    {
+        "id": "HUM-6025",
+        "summary": "OpenJDK 17",
+        "status": "Declined",
+        "submitted": "2026-05-01T00:00:00+0000",
+        "updated": "2026-06-01T00:00:00+0000",
+        "resolution_date": "2026-06-01T00:00:00+0000",
+        "notes": None,
+    },
+]
+
+
+class TestImageRequestTools:
+    """list_image_requests and get_image_request with their public deep links."""
+
+    @pytest.mark.asyncio
+    async def test_list_requests(self) -> None:
+        with _patch_client(_mock_response(json_data=REQUESTS)) as client_cls:
+            result = await list_image_requests()
+        assert _requested_url(client_cls) == "/image-requests"
+        assert result["count"] == 3
+        first = result["image_requests"][0]
+        assert first["key"] == "HUM-8787"
+        assert first["title"] == "Redis 8"
+        assert first["deep_link"] == "https://images.redhat.com/image-requests?request=HUM-8787"
+
+    @pytest.mark.asyncio
+    async def test_list_requests_filters(self) -> None:
+        with _patch_client(_mock_response(json_data=REQUESTS)):
+            by_status = await list_image_requests(status="Delivered")
+            by_search = await list_image_requests(search="openjdk")
+            by_key = await list_image_requests(search="HUM-8787")
+        assert [r["key"] for r in by_status["image_requests"]] == ["HUM-6024"]
+        assert {r["key"] for r in by_search["image_requests"]} == {"HUM-6024", "HUM-6025"}
+        assert [r["key"] for r in by_key["image_requests"]] == ["HUM-8787"]
+
+    @pytest.mark.asyncio
+    async def test_get_request_by_key(self) -> None:
+        with _patch_client(_mock_response(json_data=REQUESTS)):
+            by_full = await get_image_request("HUM-8787")
+            by_bare = await get_image_request("8787")
+            by_alias = await get_image_request("req-8787")
+            by_lower = await get_image_request("hum-8787")
+        for result in (by_full, by_bare, by_alias, by_lower):
+            assert result["key"] == "HUM-8787"
+            assert result["notes"] == "SSPL — license review required"
+            assert result["deep_link"].endswith("?request=HUM-8787")
+
+    @pytest.mark.asyncio
+    async def test_get_request_by_title(self) -> None:
+        with _patch_client(_mock_response(json_data=REQUESTS)):
+            result = await get_image_request("Redis 8")
+        assert result["key"] == "HUM-8787"
+
+    @pytest.mark.asyncio
+    async def test_get_request_ambiguous_title(self) -> None:
+        from mcp_rhhi_crunchtools.errors import ValidationError
+
+        with _patch_client(_mock_response(json_data=REQUESTS)), pytest.raises(ValidationError):
+            await get_image_request("OpenJDK")
+
+    @pytest.mark.asyncio
+    async def test_get_request_not_found(self) -> None:
+        with _patch_client(_mock_response(json_data=REQUESTS)), pytest.raises(NotFoundError):
+            await get_image_request("HUM-99999")
+
+    @pytest.mark.asyncio
+    async def test_requests_wrapped_in_object(self) -> None:
+        with _patch_client(_mock_response(json_data={"image_requests": REQUESTS})):
+            result = await list_image_requests()
+        assert result["count"] == 3
+
+    def test_requests_client_uses_request_gateway(self) -> None:
+        """The image-request client points at the request gateway, not the catalog."""
+        from mcp_rhhi_crunchtools.client import get_client, get_requests_client
+        from mcp_rhhi_crunchtools.config import get_config
+
+        config = get_config()
+        assert get_requests_client()._base_url == config.requests_api_base_url
+        assert get_client()._base_url == config.api_base_url
+        assert get_requests_client()._base_url != get_client()._base_url
 
 
 class TestClientErrorHandling:

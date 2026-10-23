@@ -13,6 +13,10 @@ Usage:
 Environment Variables:
     RHHI_API_URL: Optional. Catalog API base URL
         (default: https://api-hummingbird.hummingbird-project.io).
+    RHHI_REQUESTS_API_URL: Optional. Image-request API gateway base URL
+        (default: the gateway images.redhat.com/image-requests calls).
+    RHHI_SITE_URL: Optional. Public site base URL for image-request deep links
+        (default: https://images.redhat.com).
     RHHI_TIMEOUT: Optional. Request timeout in seconds (default: 30).
 
 Example with Claude Code:
@@ -23,7 +27,7 @@ import argparse
 
 from .server import mcp
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 DEFAULT_PORT = 8030
 __all__ = ["main", "mcp"]
 

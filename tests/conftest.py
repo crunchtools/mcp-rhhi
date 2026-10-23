@@ -17,9 +17,11 @@ def _reset_client_singleton() -> Generator[None, None, None]:
     import mcp_rhhi_crunchtools.config as config_mod
 
     client_mod._client = None
+    client_mod._requests_client = None
     config_mod._config = None
     yield
     client_mod._client = None
+    client_mod._requests_client = None
     config_mod._config = None
 
 
@@ -48,6 +50,7 @@ def _patch_client(mock_response: httpx.Response) -> Any:
     import mcp_rhhi_crunchtools.config as config_mod
 
     client_mod._client = None
+    client_mod._requests_client = None
     config_mod._config = None
 
     mock_http = AsyncMock(spec=httpx.AsyncClient)

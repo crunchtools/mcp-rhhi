@@ -1,6 +1,6 @@
 [project]
 name = "mcp-rhhi-crunchtools"
-version = "0.1.0"
+version = "0.2.0"
 description = "Secure MCP server for the Hummingbird / Red Hat Hardened Images catalog: images, tags, CVEs, SBOMs"
 requires-python = ">=3.10"
 license = "AGPL-3.0-or-later"

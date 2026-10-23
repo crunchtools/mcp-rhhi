@@ -78,6 +78,28 @@ OptionalSeverity = Annotated[Severity | None, BeforeValidator(_lower_or_none)]
 SbomCategory = Literal["runtime", "build", "source"]
 OptionalSbomCategory = Annotated[SbomCategory | None, BeforeValidator(_lower_or_none)]
 
+# Friendly image-request statuses as shown on images.redhat.com. The request API
+# already returns these; the normalizer just canonicalizes case/spacing.
+RequestStatus = Literal["Submitted", "In progress", "Delivered", "Declined"]
+_STATUS_CANON = {s.lower(): s for s in ("Submitted", "In progress", "Delivered", "Declined")}
+
+
+def _status_or_none(value: Any) -> Any:
+    value = _blank_to_none(value)
+    if isinstance(value, str):
+        return _STATUS_CANON.get(value.lower(), value)
+    return value
+
+
+OptionalRequestStatus = Annotated[RequestStatus | None, BeforeValidator(_status_or_none)]
+
+# A HUM key ("HUM-8787" or a bare "8787") or an image title; matched client-side,
+# never placed in a URL path, so it only needs a length bound.
+RequestIdentifier = Annotated[
+    Annotated[str, StringConstraints(min_length=1, max_length=MAX_QUERY_LENGTH)],
+    BeforeValidator(_strip),
+]
+
 
 # Optional positive result caps; zero, negative or blank means the tool's default.
 HistoryLimit = Annotated[
