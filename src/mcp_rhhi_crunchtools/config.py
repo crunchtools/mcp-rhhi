@@ -32,7 +32,7 @@ def _clean_url(raw: str, name: str) -> str:
     except ValueError as e:
         raise ConfigurationError(f"Invalid {name}: bad port") from e
     if not parsed.scheme or not parsed.netloc:
-        raise ConfigurationError(f"Invalid {name}: must be a URL like {DEFAULT_API_URL}")
+        raise ConfigurationError(f"Invalid {name}: must be an absolute https:// URL")
     if parsed.scheme != "https" and parsed.hostname not in LOCAL_HOSTS:
         raise ConfigurationError(f"{name} must use HTTPS for non-localhost URLs")
     if parsed.username or parsed.password or parsed.query or parsed.fragment:

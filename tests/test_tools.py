@@ -547,6 +547,27 @@ class TestImageRequestTools:
             result = await list_image_requests()
         assert result["count"] == 3
 
+    @pytest.mark.asyncio
+    async def test_requests_wrapped_under_requests_key(self) -> None:
+        with _patch_client(_mock_response(json_data={"requests": REQUESTS})):
+            result = await list_image_requests()
+        assert result["count"] == 3
+        assert result["image_requests"][0]["key"] == "HUM-8787"
+
+    @pytest.mark.asyncio
+    async def test_get_request_ambiguous_caps_message(self) -> None:
+        from mcp_rhhi_crunchtools.errors import ValidationError
+        from mcp_rhhi_crunchtools.tools.requests import MAX_AMBIGUOUS_LISTED
+
+        many = [{"id": f"HUM-{9000 + n}", "summary": f"Kafka {n}"} for n in range(25)]
+        with _patch_client(_mock_response(json_data=many)), pytest.raises(ValidationError) as exc:
+            await get_image_request("Kafka")
+        message = str(exc.value)
+        assert len(message) <= 200
+        assert "25 requests match" in message
+        assert message.count("HUM-") <= MAX_AMBIGUOUS_LISTED
+        assert "..." in message
+
     def test_requests_client_uses_request_gateway(self) -> None:
         """The image-request client points at the request gateway, not the catalog."""
         from mcp_rhhi_crunchtools.client import get_client, get_requests_client

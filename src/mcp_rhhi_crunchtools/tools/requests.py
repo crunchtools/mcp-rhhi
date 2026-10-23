@@ -11,7 +11,7 @@ from urllib.parse import quote
 
 from ..client import get_requests_client
 from ..config import get_config
-from ..errors import NotFoundError, ValidationError
+from ..errors import SAFE_MESSAGE_MAX_LENGTH, NotFoundError, ValidationError
 
 REQUESTS_PATH = "/image-requests"
 MAX_AMBIGUOUS_LISTED = 10
@@ -100,7 +100,6 @@ async def get_image_request(request: str) -> dict[str, Any]:
     if len(matches) > 1:
         keys = [m.get("id") or "?" for m in matches[:MAX_AMBIGUOUS_LISTED]]
         more = "" if len(matches) <= MAX_AMBIGUOUS_LISTED else ", ..."
-        raise ValidationError(
-            f"{len(matches)} requests match '{request}': {', '.join(keys)}{more}. Use the HUM key."
-        )
+        message = f"{len(matches)} requests match: {', '.join(keys)}{more}. Use the HUM key."
+        raise ValidationError(message[:SAFE_MESSAGE_MAX_LENGTH])
     raise NotFoundError(request)
