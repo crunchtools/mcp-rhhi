@@ -18,9 +18,26 @@ MAX_AMBIGUOUS_LISTED = 10
 
 
 def deep_link(key: str) -> str:
-    """Public URL that opens one request on the images.redhat.com site."""
+    """Public URL that opens one request on the images.redhat.com site.
+
+    The request API's ``id`` is the Jira ``HUM-NNNN`` key, but the live site
+    resolves the public ``REQ-NNNN`` alias (same number, swapped prefix); the
+    ``HUM-`` form does not open reliably. Translate the key to its ``REQ-``
+    alias before building the URL.
+    """
     base = get_config().site_base_url
-    return f"{base}/image-requests?request={quote(key, safe='')}"
+    return f"{base}/image-requests?request={quote(public_alias(key), safe='')}"
+
+
+def public_alias(key: str) -> str:
+    """Translate a canonical ``HUM-NNNN`` key to its public ``REQ-NNNN`` alias.
+
+    Inverse of :func:`normalize_key`. A ``HUM-`` prefix becomes ``REQ-``,
+    keeping the number; anything else is returned unchanged.
+    """
+    if key.startswith("HUM-"):
+        return "REQ-" + key[4:]
+    return key
 
 
 def normalize_key(value: str) -> str:

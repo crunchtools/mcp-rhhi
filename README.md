@@ -51,7 +51,7 @@ A secure, read-only MCP (Model Context Protocol) server for the [Hummingbird](ht
 - `list_image_requests` - requests for new images on [images.redhat.com/image-requests](https://images.redhat.com/image-requests); filter by status or a title/key substring
 - `get_image_request` - one request by HUM key or image title; returns status, status note and the public `deep_link`
 
-Each request includes its HUM key, title, friendly status (Submitted / In progress / Delivered / Declined) and a `deep_link` of the form `https://images.redhat.com/image-requests?request=HUM-NNNN` that opens it on the site.
+Each request includes its HUM key, title, friendly status (Submitted / In progress / Delivered / Declined) and a `deep_link` of the form `https://images.redhat.com/image-requests?request=REQ-NNNN` that opens it on the site. (The site resolves the public `REQ-` alias; the API's underlying Jira key keeps the `HUM-` prefix with the same number.)
 
 ## Installation
 

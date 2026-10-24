@@ -499,7 +499,7 @@ class TestImageRequestTools:
         first = result["image_requests"][0]
         assert first["key"] == "HUM-8787"
         assert first["title"] == "Redis 8"
-        assert first["deep_link"] == "https://images.redhat.com/image-requests?request=HUM-8787"
+        assert first["deep_link"] == "https://images.redhat.com/image-requests?request=REQ-8787"
 
     @pytest.mark.asyncio
     async def test_list_requests_filters(self) -> None:
@@ -521,7 +521,7 @@ class TestImageRequestTools:
         for result in (by_full, by_bare, by_alias, by_lower):
             assert result["key"] == "HUM-8787"
             assert result["notes"] == "SSPL — license review required"
-            assert result["deep_link"].endswith("?request=HUM-8787")
+            assert result["deep_link"].endswith("?request=REQ-8787")
 
     @pytest.mark.asyncio
     async def test_get_request_by_title(self) -> None:

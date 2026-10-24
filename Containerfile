@@ -24,7 +24,7 @@ RUN pip install --no-cache-dir .
 FROM quay.io/hummingbird/python:3.14
 
 LABEL name="mcp-rhhi-crunchtools" \
-      version="0.1.0" \
+      version="0.2.1" \
       summary="Read-only MCP server for the Hummingbird / Red Hat Hardened Images catalog" \
       description="Images, tags, container config, SBOMs and CVEs from the Hummingbird catalog API" \
       maintainer="crunchtools.com" \
