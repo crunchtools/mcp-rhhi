@@ -45,7 +45,7 @@ READ_ONLY = {"readOnlyHint": True}
 
 mcp = FastMCP(
     name="mcp-rhhi-crunchtools",
-    version="0.2.0",
+    version="0.2.1",
     instructions=(
         "Hummingbird / Red Hat Hardened Images catalog: minimal, distroless OCI "
         "images. Typical flow: list_images to find an image, list_tags for its "

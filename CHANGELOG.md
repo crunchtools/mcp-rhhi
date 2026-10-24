@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-24
+
+### Fixed
+
+- `list_image_requests` / `get_image_request`: the `deep_link` now uses the
+  public `REQ-NNNN` alias (`/image-requests?request=REQ-NNNN`) instead of the
+  underlying Jira `HUM-NNNN` key. The `HUM-` form does not open reliably on
+  images.redhat.com; the site resolves `REQ-` with the same number.
+
 ## [0.2.0] - 2026-10-23
 
 ### Added
