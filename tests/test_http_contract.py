@@ -144,3 +144,20 @@ class TestSnippetBudget:
 
     def test_an_empty_body_says_so(self) -> None:
         assert client_mod._body_snippet(b"") == "<empty body>"
+
+
+class TestJsonErrorBranch:
+    """A server-chosen `error` field is as long as the server made it."""
+
+    @pytest.mark.asyncio
+    async def test_a_json_error_is_capped_and_names_the_request(self) -> None:
+        def handler(_request: httpx.Request) -> httpx.Response:
+            return httpx.Response(500, json={"error": "z" * 100_000})
+
+        with _serving(handler), pytest.raises(CatalogApiError) as caught:
+            await client_mod.get_client().get("/images")
+
+        message = str(caught.value)
+        assert "/v1/images" in message
+        assert "application/json" in message
+        assert len(message) < 500

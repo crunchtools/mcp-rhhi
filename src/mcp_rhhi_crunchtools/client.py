@@ -177,14 +177,17 @@ def _raise_for_status(response: httpx.Response, body: bytes, path: str) -> None:
         parsed = json.loads(body)
     except ValueError:
         parsed = None
-    if isinstance(parsed, dict):
-        error_msg = str(parsed.get("error") or parsed.get("message") or parsed)
-    else:
-        # Not the whole body: this branch is what a WAF page or a gateway error
-        # takes, and decoding a 20 MB one of those made a 20 MB exception
-        # string. The snippet is bounded and says where it came from.
-        error_msg = f"{_where(response)} returned {_body_snippet(body)}"
-    raise CatalogApiError(status_code, error_msg)
+    # Both branches through one cap and one shape. The else branch is what a WAF
+    # page or a gateway error takes, and it used to decode the whole body into
+    # the message -- a 20 MB error page became a 20 MB exception string. The
+    # dict branch escaped both the cap and the request context, because an
+    # `error` field is as long as the server chose to make it.
+    detail = (
+        str(parsed.get("error") or parsed.get("message") or parsed).encode()
+        if isinstance(parsed, dict)
+        else body
+    )
+    raise CatalogApiError(status_code, f"{_where(response)} returned {_body_snippet(detail)}")
 
 
 _client: CatalogClient | None = None
