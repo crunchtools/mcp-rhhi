@@ -182,8 +182,13 @@ def _raise_for_status(response: httpx.Response, body: bytes, path: str) -> None:
     # the message -- a 20 MB error page became a 20 MB exception string. The
     # dict branch escaped both the cap and the request context, because an
     # `error` field is as long as the server chose to make it.
+    # Sliced before encoding: an `error` field is as long as the server chose,
+    # and encoding all of it to keep 200 characters copies it for nothing. Four
+    # times the snippet is the same slack `_body_snippet` takes on bytes.
     detail = (
-        str(parsed.get("error") or parsed.get("message") or parsed).encode()
+        str(parsed.get("error") or parsed.get("message") or parsed)[
+            : BODY_SNIPPET_CHARS * 4
+        ].encode()
         if isinstance(parsed, dict)
         else body
     )
