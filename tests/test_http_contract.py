@@ -128,3 +128,19 @@ class TestErrorNamesTheSite:
         assert "/v1/images" in message
         # Bounded: the old code decoded the whole body into the exception.
         assert len(message) < 500
+
+
+class TestSnippetBudget:
+    """The manifest caps a quoted body at 200 characters, so it is 200."""
+
+    def test_a_long_body_is_cut_to_the_cap_including_the_ellipsis(self) -> None:
+        snippet = client_mod._body_snippet(b"y" * 100_000)
+
+        assert len(snippet) == client_mod.BODY_SNIPPET_CHARS
+        assert snippet.endswith("...")
+
+    def test_a_short_body_is_quoted_whole(self) -> None:
+        assert client_mod._body_snippet(b"nope") == "nope"
+
+    def test_an_empty_body_says_so(self) -> None:
+        assert client_mod._body_snippet(b"") == "<empty body>"

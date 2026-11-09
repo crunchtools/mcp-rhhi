@@ -31,6 +31,7 @@ USER_AGENT = (
 # a gateway error or an SSO redirect; short enough to stay readable, and bounded
 # so a 20 MB error page does not become a 20 MB exception string.
 BODY_SNIPPET_CHARS = 200
+ELLIPSIS = "..."
 
 
 def _body_snippet(body: bytes) -> str:
@@ -42,7 +43,9 @@ def _body_snippet(body: bytes) -> str:
     if not collapsed:
         return "<empty body>"
     if len(collapsed) > BODY_SNIPPET_CHARS or len(body) > len(prefix):
-        return collapsed[:BODY_SNIPPET_CHARS] + "..."
+        # The ellipsis comes out of the budget, not on top of it: the manifest
+        # caps a quoted body at 200 characters and 200 + "..." is 203.
+        return collapsed[: BODY_SNIPPET_CHARS - len(ELLIPSIS)] + ELLIPSIS
     return collapsed
 
 
