@@ -142,17 +142,21 @@ async def _read_capped(response: httpx.Response) -> bytes:
             f"{_where(response)} declared {content_length} bytes, over the "
             f"{MAX_RESPONSE_SIZE} byte limit",
         )
-    # One growing buffer, not a list of chunks plus a full-size join: near the
-    # ceiling the join holds both copies at once, which doubles the peak this
-    # limit exists to bound.
+    # One growing buffer rather than a list of chunks plus a `b"".join()`: near
+    # the ceiling the join holds both copies at the same instant, so the peak is
+    # roughly twice the limit this cap exists to bound. And the length is
+    # checked BEFORE the chunk is copied in, because `aiter_bytes()` yields
+    # whatever the stream produces -- a single chunk can be the whole body --
+    # so appending first would let exactly the response this refuses into
+    # memory on the way to refusing it.
     body = bytearray()
     async for chunk in response.aiter_bytes():
-        body += chunk
-        if len(body) > MAX_RESPONSE_SIZE:
+        if len(body) + len(chunk) > MAX_RESPONSE_SIZE:
             raise CatalogApiError(
                 response.status_code,
                 f"{_where(response)} sent over the {MAX_RESPONSE_SIZE} byte limit",
             )
+        body += chunk
     return bytes(body)
 
 
