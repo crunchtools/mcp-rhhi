@@ -614,8 +614,14 @@ class TestClientErrorHandling:
     @pytest.mark.asyncio
     async def test_oversized_response(self) -> None:
         resp = _mock_response(200, json_data={}, headers={"content-length": str(50 * 1024**2)})
-        with _patch_client(resp), pytest.raises(CatalogApiError, match="too large"):
+        with _patch_client(resp), pytest.raises(CatalogApiError) as exc:
             await list_images()
+
+        assert str(exc.value) == (
+            "Catalog API error 200: "
+            "GET https://api-hummingbird.hummingbird-project.io/v1/test "
+            "(HTTP 200, application/json) declared 52428800 bytes, over the 20971520 byte limit"
+        )
 
     @pytest.mark.asyncio
     async def test_transport_error(self) -> None:
@@ -640,8 +646,14 @@ class TestClientErrorHandling:
         monkeypatch.setattr(client_mod, "MAX_RESPONSE_SIZE", 10)
         resp = _mock_response(200, text='{"images": ["' + "x" * 50 + '"]}')
         resp.headers.pop("content-length", None)
-        with _patch_client(resp), pytest.raises(CatalogApiError, match="too large"):
+        with _patch_client(resp), pytest.raises(CatalogApiError) as exc:
             await list_images()
+
+        assert str(exc.value) == (
+            "Catalog API error 200: "
+            "GET https://api-hummingbird.hummingbird-project.io/v1/test "
+            "(HTTP 200, application/json) sent over the 10 byte limit"
+        )
 
     @pytest.mark.asyncio
     async def test_absurd_retry_after_ignored(self) -> None:

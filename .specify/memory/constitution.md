@@ -3,7 +3,7 @@
 > **Version:** 1.0.0
 > **Ratified:** 2026-10-16
 > **Status:** Active
-> **Inherits:** [crunchtools/constitution](https://github.com/crunchtools/constitution) v1.31.0
+> **Inherits:** [crunchtools/constitution](https://github.com/crunchtools/constitution) v1.36.0
 > **Profile:** MCP Server
 
 This file holds what is specific to mcp-rhhi. The fleet rules and the MCP
@@ -22,8 +22,10 @@ repo's files by `constitution.yml`. They are not restated here.
   advisory IDs `^[A-Za-z]{2,5}-[A-Za-z0-9-]{4,40}$`; severities and SBOM
   categories are enums. `segment()` and `digest_segment()` re-check before a
   value reaches a URL.
-- **API:** TLS verified; `RHHI_TIMEOUT` (default 30s); responses capped at 20MB;
-  error text capped at 200 characters.
+- **API:** TLS verified; `RHHI_TIMEOUT` (default 30s); responses capped at 20MB
+  while reading, not from the `content-length` header a chunked reply need not
+  send; a body quoted back in an error capped at 200 characters, alongside the
+  method, URL, status and content-type of the request it answered.
 - **Surface:** every tool is a GET and is annotated `readOnlyHint`.
 
 ## Instance
