@@ -5,6 +5,7 @@ Every endpoint the catalog exposes is a GET, so the client only offers get().
 
 import json
 import logging
+from importlib.metadata import version
 from typing import Any
 
 import httpx
@@ -16,6 +17,47 @@ logger = logging.getLogger(__name__)
 
 MAX_RESPONSE_SIZE = 20 * 1024 * 1024
 MAX_RETRY_DIGITS = 6
+
+# Identify this client by name. httpx otherwise sends `python-httpx/<version>`,
+# which bot protection answers with an HTML challenge page instead of the API --
+# the failure that cost an afternoon on mcp-wordpress (RT #1596). The version
+# comes from installed package metadata so it cannot drift from pyproject.toml.
+USER_AGENT = (
+    f"mcp-rhhi-crunchtools/{version('mcp-rhhi-crunchtools')} "
+    "(+https://github.com/crunchtools/mcp-rhhi)"
+)
+
+# How much of a body to quote back in an error. Enough to recognise a WAF page,
+# a gateway error or an SSO redirect; short enough to stay readable, and bounded
+# so a 20 MB error page does not become a 20 MB exception string.
+BODY_SNIPPET_CHARS = 200
+
+
+def _body_snippet(body: bytes) -> str:
+    """A short, single-line excerpt of a response body, for an error message."""
+    # Slice the bytes, then decode only that: decoding all of a megabyte body to
+    # keep 200 characters copies it twice for nothing.
+    prefix = body[: BODY_SNIPPET_CHARS * 4]
+    collapsed = " ".join(prefix.decode("utf-8", errors="replace").split())
+    if not collapsed:
+        return "<empty body>"
+    if len(collapsed) > BODY_SNIPPET_CHARS or len(body) > len(prefix):
+        return collapsed[:BODY_SNIPPET_CHARS] + "..."
+    return collapsed
+
+
+def _where(response: httpx.Response) -> str:
+    """Which request a response answered, for an error message.
+
+    The requested URL rather than the path the caller passed: this client is
+    pointed at two different gateways by `base_url`, so the path alone does not
+    say which one answered, and a base URL that redirects returns a body from
+    somewhere else entirely.
+    """
+    return (
+        f"{response.request.method} {response.request.url} "
+        f"(HTTP {response.status_code}, {response.headers.get('content-type', 'no content-type')})"
+    )
 
 
 class CatalogClient:
@@ -37,7 +79,11 @@ class CatalogClient:
         if self._client is None:
             self._client = httpx.AsyncClient(
                 base_url=self._base_url,
-                headers={"Accept": "application/json", "Accept-Encoding": "gzip"},
+                headers={
+                    "Accept": "application/json",
+                    "Accept-Encoding": "gzip",
+                    "User-Agent": USER_AGENT,
+                },
                 timeout=httpx.Timeout(self._config.timeout),
             )
         return self._client
@@ -83,18 +129,31 @@ class CatalogClient:
 
 
 async def _read_capped(response: httpx.Response) -> bytes:
-    """Read the decoded body, aborting as soon as it passes MAX_RESPONSE_SIZE."""
+    """Read the decoded body, aborting as soon as it passes MAX_RESPONSE_SIZE.
+
+    Decoded and not raw, which is the side of `Accept-Encoding: gzip` that
+    matters: a limit counted on the wire is one a compressed body expands
+    straight past after the count.
+    """
     content_length = response.headers.get("content-length")
     if content_length and content_length.isdigit() and int(content_length) > MAX_RESPONSE_SIZE:
-        raise CatalogApiError(0, "Response too large")
-    chunks: list[bytes] = []
-    size = 0
+        raise CatalogApiError(
+            response.status_code,
+            f"{_where(response)} declared {content_length} bytes, over the "
+            f"{MAX_RESPONSE_SIZE} byte limit",
+        )
+    # One growing buffer, not a list of chunks plus a full-size join: near the
+    # ceiling the join holds both copies at once, which doubles the peak this
+    # limit exists to bound.
+    body = bytearray()
     async for chunk in response.aiter_bytes():
-        size += len(chunk)
-        if size > MAX_RESPONSE_SIZE:
-            raise CatalogApiError(0, "Response too large")
-        chunks.append(chunk)
-    return b"".join(chunks)
+        body += chunk
+        if len(body) > MAX_RESPONSE_SIZE:
+            raise CatalogApiError(
+                response.status_code,
+                f"{_where(response)} sent over the {MAX_RESPONSE_SIZE} byte limit",
+            )
+    return bytes(body)
 
 
 def _raise_for_status(response: httpx.Response, body: bytes, path: str) -> None:
@@ -114,7 +173,10 @@ def _raise_for_status(response: httpx.Response, body: bytes, path: str) -> None:
     if isinstance(parsed, dict):
         error_msg = str(parsed.get("error") or parsed.get("message") or parsed)
     else:
-        error_msg = body.decode("utf-8", errors="replace") or "Unknown error"
+        # Not the whole body: this branch is what a WAF page or a gateway error
+        # takes, and decoding a 20 MB one of those made a 20 MB exception
+        # string. The snippet is bounded and says where it came from.
+        error_msg = f"{_where(response)} returned {_body_snippet(body)}"
     raise CatalogApiError(status_code, error_msg)
 
 
