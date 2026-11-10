@@ -10,21 +10,32 @@
 # With Claude Code:
 #   claude mcp add mcp-rhhi-crunchtools -- podman run -i --rm quay.io/crunchtools/mcp-rhhi
 
+# Stage 0: Lock (resolve the locked deps to a plain requirements list)
+FROM quay.io/hummingbird/python:3.14-builder AS lock
+USER 0
+RUN pip install --no-cache-dir uv==0.13.7
+WORKDIR /lock
+COPY pyproject.toml uv.lock ./
+RUN uv export --frozen --no-dev --no-emit-project \
+      --format requirements-txt -o /requirements.txt
+
 # Stage 1: Builder (has shell, dnf, build tools)
 FROM quay.io/hummingbird/python:3.14-builder AS builder
 USER 0
 WORKDIR /app
 RUN python3 -m venv /app/venv
 ENV PATH="/app/venv/bin:$PATH"
+COPY --from=lock /requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir --no-deps -r /tmp/requirements.txt
 COPY pyproject.toml README.md ./
 COPY src/ ./src/
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir --no-deps .
 
 # Stage 2: Runtime (distroless — no shell, no package manager)
 FROM quay.io/hummingbird/python:3.14
 
 LABEL name="mcp-rhhi-crunchtools" \
-      version="0.3.0" \
+      version="0.3.1" \
       summary="Read-only MCP server for the Hummingbird / Red Hat Hardened Images catalog" \
       description="Images, tags, container config, SBOMs and CVEs from the Hummingbird catalog API" \
       maintainer="crunchtools.com" \
